@@ -108,7 +108,7 @@ public class BitfinexStreamingRawService extends JsonNettyStreamingService {
                 case "os":
                     addOrder(object);
                     break;
-                case "on":
+                case "n":
                 case "ou":
                 case "oc":
                     updateOrder(object);
