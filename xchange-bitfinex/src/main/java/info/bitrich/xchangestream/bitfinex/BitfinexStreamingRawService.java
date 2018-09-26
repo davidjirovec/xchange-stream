@@ -3,12 +3,7 @@ package info.bitrich.xchangestream.bitfinex;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexAuthRequestStatus;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuth;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthBalance;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthOrder;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthPreTrade;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthTrade;
+import info.bitrich.xchangestream.bitfinex.dto.*;
 import info.bitrich.xchangestream.service.netty.JsonNettyStreamingService;
 import io.reactivex.Observable;
 import io.reactivex.subjects.PublishSubject;
@@ -41,6 +36,7 @@ public class BitfinexStreamingRawService extends JsonNettyStreamingService {
     private PublishSubject<BitfinexWebSocketAuthTrade> subjectTrade = PublishSubject.create();
     private PublishSubject<BitfinexWebSocketAuthOrder> subjectOrder = PublishSubject.create();
     private PublishSubject<BitfinexWebSocketAuthBalance> subjectBalance = PublishSubject.create();
+    private PublishSubject<BitfinexWebSocketAuthNotification> subjectNotification = PublishSubject.create();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public BitfinexStreamingRawService(String apiUrl) {
@@ -118,6 +114,9 @@ public class BitfinexStreamingRawService extends JsonNettyStreamingService {
                     break;
                 case "wu":
                     updateBalance(object);
+                    break;
+                case "n":
+                    addNotification(object);
                     break;
             }
         }
@@ -200,6 +199,17 @@ public class BitfinexStreamingRawService extends JsonNettyStreamingService {
                 subjectBalance.onNext(balanceObject);
             }
         }
+    }
+
+    public void addNotification(JsonNode notification) {
+        if (notification.size() < 8) {
+            LOG.error("addNotification unexpected record size={}, record={}", notification.size(), notification.toString());
+            return;
+        }
+        final String text = notification.get(7).textValue();
+        BitfinexWebSocketAuthNotification notificationObject = new BitfinexWebSocketAuthNotification(text);
+        LOG.debug("New notification: {}", notificationObject);
+        subjectNotification.onNext(notificationObject);
     }
 
     private BitfinexWebSocketAuthBalance createBalanceObject(JsonNode balance) {
@@ -299,5 +309,9 @@ public class BitfinexStreamingRawService extends JsonNettyStreamingService {
 
     public Observable<BitfinexWebSocketAuthBalance> getAuthenticatedBalances() {
         return subjectBalance.share();
+    }
+
+    public Observable<BitfinexWebSocketAuthNotification> getAuthenticatedNotifications() {
+        return subjectNotification.share();
     }
 }
