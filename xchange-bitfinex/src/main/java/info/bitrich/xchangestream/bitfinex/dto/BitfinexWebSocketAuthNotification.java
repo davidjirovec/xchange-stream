@@ -1,13 +1,12 @@
 package info.bitrich.xchangestream.bitfinex.dto;
 
-import java.util.List;
 import java.util.Objects;
 
 public class BitfinexWebSocketAuthNotification {
-    private List<BitfinexWebSocketAuthOrder> notifyInfo;
+    private BitfinexWebSocketAuthOrder notifyInfo;
     private String text;
 
-    public BitfinexWebSocketAuthNotification(List<BitfinexWebSocketAuthOrder> notifyInfo, String text) {
+    public BitfinexWebSocketAuthNotification(BitfinexWebSocketAuthOrder notifyInfo, String text) {
         this.notifyInfo = notifyInfo;
         this.text = text;
     }
@@ -26,7 +25,7 @@ public class BitfinexWebSocketAuthNotification {
         return Objects.hash(notifyInfo, text);
     }
 
-    public List<BitfinexWebSocketAuthOrder> getNotifyInfo() {
+    public BitfinexWebSocketAuthOrder getNotifyInfo() {
         return notifyInfo;
     }
 

@@ -18,9 +18,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 import static org.knowm.xchange.service.BaseParamsDigest.HMAC_SHA_384;
 
@@ -209,10 +206,7 @@ public class BitfinexStreamingRawService extends JsonNettyStreamingService {
             LOG.error("addNotification unexpected record size={}, record={}", notification.size(), notification.toString());
             return;
         }
-        List<BitfinexWebSocketAuthOrder> notifyInfo = StreamSupport
-                .stream(notification.get(4).spliterator(), false)
-                .map(this::createOrderObject)
-                .collect(Collectors.toList());
+        BitfinexWebSocketAuthOrder notifyInfo = createOrderObject(notification.get(4));
         String text = notification.get(7).textValue();
         BitfinexWebSocketAuthNotification notificationObject = new BitfinexWebSocketAuthNotification(notifyInfo, text);
         LOG.debug("New notification: {}", notificationObject);
