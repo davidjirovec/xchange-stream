@@ -1,10 +1,14 @@
 package info.bitrich.xchangestream.bitfinex;
 
-import info.bitrich.xchangestream.core.StreamingExchange;
 import info.bitrich.xchangestream.core.StreamingExchangeFactory;
+import io.reactivex.disposables.Disposable;
+import org.knowm.xchange.ExchangeSpecification;
 import org.knowm.xchange.currency.CurrencyPair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Created by Lukas Zaoralek on 7.11.17.
@@ -13,23 +17,16 @@ public class BitfinexManualExample {
     private static final Logger LOG = LoggerFactory.getLogger(BitfinexManualExample.class);
 
     public static void main(String[] args) {
-        StreamingExchange exchange = StreamingExchangeFactory.INSTANCE.createExchange(BitfinexStreamingExchange.class
-                .getName());
-        exchange.connect().blockingAwait();
+        final ExchangeSpecification bitfinexSpecification = new ExchangeSpecification(BitfinexStreamingExchange.class);
+        bitfinexSpecification.setShouldLoadRemoteMetaData(true);
+        final BitfinexStreamingExchange bitfinexExchange = ((BitfinexStreamingExchange) StreamingExchangeFactory.INSTANCE.createExchange(bitfinexSpecification));
+        bitfinexExchange.connect().blockingAwait();
 
-        exchange.getStreamingMarketDataService().getOrderBook(CurrencyPair.BTC_USD).subscribe(orderBook -> {
-            LOG.info("First ask: {}", orderBook.getAsks().get(0));
-            LOG.info("First bid: {}", orderBook.getBids().get(0));
-        }, throwable -> LOG.error("ERROR in getting order book: ", throwable));
+        final List<Disposable> collect = bitfinexExchange.getExchangeSymbols().stream().filter(cp -> cp.equals(new CurrencyPair("TNB", "BTC"))).limit(250).limit(45).map(currencyPair -> bitfinexExchange.getStreamingMarketDataService().getOrderBook(currencyPair, 25).subscribe(orderBook -> {
+//            LOG.info("First ask: {}", orderBook.getAsks().get(0));
+//            LOG.info("First bid: {}", orderBook.getBids().get(0));
+        })).collect(Collectors.toList());
 
-        exchange.getStreamingMarketDataService().getTicker(CurrencyPair.BTC_EUR).subscribe(ticker -> {
-            LOG.info("TICKER: {}", ticker);
-        }, throwable -> LOG.error("ERROR in getting ticker: ", throwable));
-
-        exchange.getStreamingMarketDataService().getTrades(CurrencyPair.BTC_USD)
-                .subscribe(trade -> {
-                    LOG.info("TRADE: {}", trade);
-                }, throwable -> LOG.error("ERROR in getting trade: ", throwable));
 
         try {
             Thread.sleep(10000);

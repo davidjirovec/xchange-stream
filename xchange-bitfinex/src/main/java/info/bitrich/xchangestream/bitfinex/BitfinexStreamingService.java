@@ -2,7 +2,6 @@ package info.bitrich.xchangestream.bitfinex;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexAuthRequestStatus;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSubscriptionMessage;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketUnSubscriptionMessage;
 import info.bitrich.xchangestream.service.netty.JsonNettyStreamingService;
@@ -12,8 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Created by Lukas Zaoralek on 7.11.17.
@@ -30,7 +29,7 @@ public class BitfinexStreamingService extends JsonNettyStreamingService {
 
     private static final int SUBSCRIPTION_FAILED = 10300;
 
-    private final Map<String, String> subscribedChannels = new HashMap<>();
+    private final Map<String, String> subscribedChannels = new ConcurrentHashMap<>();
 
     public BitfinexStreamingService(String apiUrl) {
         super(apiUrl, Integer.MAX_VALUE);
