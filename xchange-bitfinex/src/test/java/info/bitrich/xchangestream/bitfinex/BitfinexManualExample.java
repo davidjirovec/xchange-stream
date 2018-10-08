@@ -3,7 +3,6 @@ package info.bitrich.xchangestream.bitfinex;
 import info.bitrich.xchangestream.core.StreamingExchangeFactory;
 import io.reactivex.disposables.Disposable;
 import org.knowm.xchange.ExchangeSpecification;
-import org.knowm.xchange.currency.CurrencyPair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +21,7 @@ public class BitfinexManualExample {
         final BitfinexStreamingExchange bitfinexExchange = ((BitfinexStreamingExchange) StreamingExchangeFactory.INSTANCE.createExchange(bitfinexSpecification));
         bitfinexExchange.connect().blockingAwait();
 
-        final List<Disposable> collect = bitfinexExchange.getExchangeSymbols().stream().filter(cp -> cp.equals(new CurrencyPair("TNB", "BTC"))).limit(250).limit(45).map(currencyPair -> bitfinexExchange.getStreamingMarketDataService().getOrderBook(currencyPair, 25).subscribe(orderBook -> {
+        final List<Disposable> collect = bitfinexExchange.getExchangeSymbols().stream().limit(250).map(currencyPair -> bitfinexExchange.getStreamingMarketDataService().getOrderBook(currencyPair, 25).subscribe(orderBook -> {
 //            LOG.info("First ask: {}", orderBook.getAsks().get(0));
 //            LOG.info("First bid: {}", orderBook.getBids().get(0));
         })).collect(Collectors.toList());

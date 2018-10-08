@@ -3,17 +3,15 @@ package info.bitrich.xchangestream.bitfinex.dto;
 import org.knowm.xchange.bitfinex.v1.dto.marketdata.BitfinexDepth;
 import org.knowm.xchange.bitfinex.v1.dto.marketdata.BitfinexLevel;
 
-import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static java.math.BigDecimal.ZERO;
 
 /**
  * Created by Lukas Zaoralek on 8.11.17.
  */
-public class BitfinexOrderbook implements Serializable  {
+public class BitfinexOrderbook {
     private Map<BigDecimal, BitfinexOrderbookLevel> asks;
     private Map<BigDecimal, BitfinexOrderbookLevel> bids;
 
@@ -22,8 +20,8 @@ public class BitfinexOrderbook implements Serializable  {
     }
 
     private void createFromLevels(BitfinexOrderbookLevel[] levels) {
-        this.asks = new ConcurrentHashMap<>(levels.length / 2);
-        this.bids = new ConcurrentHashMap<>(levels.length / 2);
+        this.asks = new HashMap<>(levels.length / 2);
+        this.bids = new HashMap<>(levels.length / 2);
 
         for (BitfinexOrderbookLevel level : levels) {
 
