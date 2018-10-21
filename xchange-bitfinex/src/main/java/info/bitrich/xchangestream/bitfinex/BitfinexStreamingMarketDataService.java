@@ -13,10 +13,8 @@ import org.knowm.xchange.dto.marketdata.Trades;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.zip.CRC32;
 
 import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.*;
 
@@ -44,38 +42,6 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
 
         Observable<BitfinexWebSocketOrderbookTransaction> subscribedChannel = service.subscribeChannel(channelName,
                 new Object[]{pair, "P0", depth})
-                .filter(s -> {
-                    if ("cs".equals(s.get(1).textValue())) {
-                        final OrderBook orderBook = adaptOrderBook(orderbooks.getOrDefault(currencyPair, null).toBitfinexDepth(), currencyPair);
-                        final int checksum = s.get(2).intValue();
-
-                        final ArrayList<String> csData = new ArrayList<>();
-
-                        for (int i = 0; i < 25; i++) {
-                            if (orderBook.getBids().size() > i) {
-                                csData.add(orderBook.getBids().get(i).getLimitPrice().toPlainString());
-                                csData.add(orderBook.getBids().get(i).getOriginalAmount().toPlainString());
-                            }
-                            if (orderBook.getAsks().size() > i) {
-                                csData.add(orderBook.getAsks().get(i).getLimitPrice().toPlainString());
-                                csData.add(orderBook.getAsks().get(i).getOriginalAmount().negate().toPlainString());
-                            }
-                        }
-
-                        final String csStr = String.join(":", csData);
-                        final CRC32 crc32 = new CRC32();
-                        crc32.update(csStr.getBytes());
-                        final int csCalc = (int) crc32.getValue();
-
-                        if (csCalc != checksum) {
-                            throw new RuntimeException("Invalid checksum " + csCalc + " vs " + checksum);
-                        }
-
-                        return false;
-                    }
-
-                    return true;
-                })
                 .map(s -> {
                     if (s.get(1).get(0).isArray()) return mapper.readValue(s.toString(),
                             BitfinexWebSocketSnapshotOrderbook.class);
