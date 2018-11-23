@@ -1,6 +1,7 @@
 package info.bitrich.xchangestream.bitfinex;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import info.bitrich.xchangestream.bitfinex.dto.*;
 import info.bitrich.xchangestream.core.StreamingMarketDataService;
@@ -15,8 +16,6 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 
@@ -30,8 +29,6 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
 
     private final BitfinexStreamingService service;
 
-    private Map<CurrencyPair, BitfinexOrderbook> orderbooks = new HashMap<>();
-
     public BitfinexStreamingMarketDataService(BitfinexStreamingService service) {
         this.service = service;
     }
@@ -44,11 +41,11 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
         final ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-        Observable<BitfinexWebSocketOrderbookTransaction> subscribedChannel = service.subscribeChannel(channelName,
+        return service.subscribeChannel(channelName,
                 new Object[]{pair, "P0", depth})
-                .filter(s -> {
+                .scan(new BitfinexOrderbook(new BitfinexOrderbookLevel[0]), (BitfinexOrderbook o, JsonNode s) -> {
                     if ("cs".equals(s.get(1).textValue())) {
-                        final OrderBook orderBook = adaptOrderBook(orderbooks.getOrDefault(currencyPair, null).toBitfinexDepth(), currencyPair);
+                        final OrderBook orderBook = adaptOrderBook(o.toBitfinexDepth(), currencyPair);
                         final int checksum = s.get(2).intValue();
 
                         final ArrayList<BigDecimal> csData = new ArrayList<>();
@@ -73,24 +70,14 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                             throw new RuntimeException("Invalid checksum " + csCalc + " vs " + checksum);
                         }
 
-                        return false;
+                        return o;
                     }
 
-                    return true;
-                })
-                .map(s -> {
-                    if (s.get(1).get(0).isArray()) return mapper.readValue(s.toString(),
-                            BitfinexWebSocketSnapshotOrderbook.class);
-                    else return mapper.readValue(s.toString(), BitfinexWebSocketUpdateOrderbook.class);
-                });
+                    final BitfinexWebSocketOrderbookTransaction bitfinexWebSocketOrderbookTransaction = s.get(1).get(0).isArray() ? mapper.readValue(s.toString(), BitfinexWebSocketSnapshotOrderbook.class) : mapper.readValue(s.toString(), BitfinexWebSocketUpdateOrderbook.class);
 
-        return subscribedChannel
-                .map(s -> {
-                    BitfinexOrderbook bitfinexOrderbook = s.toBitfinexOrderBook(orderbooks.getOrDefault(currencyPair,
-                            null));
-                    orderbooks.put(currencyPair, bitfinexOrderbook);
-                    return adaptOrderBook(bitfinexOrderbook.toBitfinexDepth(), currencyPair);
-                });
+                    return bitfinexWebSocketOrderbookTransaction.toBitfinexOrderBook(o);
+                })
+                .map((BitfinexOrderbook bo) ->adaptOrderBook(bo.toBitfinexDepth(), currencyPair));
     }
 
     @Override
