@@ -5,7 +5,6 @@ import org.knowm.xchange.bitfinex.v1.dto.marketdata.BitfinexLevel;
 
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static java.math.BigDecimal.ZERO;
 
@@ -21,8 +20,8 @@ public class BitfinexOrderbook {
     }
 
     private void createFromLevels(BitfinexOrderbookLevel[] levels) {
-        this.asks = new ConcurrentHashMap<>(levels.length / 2);
-        this.bids = new ConcurrentHashMap<>(levels.length / 2);
+        this.asks = new HashMap<>(levels.length / 2);
+        this.bids = new HashMap<>(levels.length / 2);
 
         for (BitfinexOrderbookLevel level : levels) {
 
