@@ -38,7 +38,8 @@ public class BitfinexStreamingExchange extends BitfinexExchange implements Strea
 
     @Override
     public Completable connect(ProductSubscription... args) {
-        return streamingService.connect();
+        return streamingService.connect()
+                .doOnComplete(() -> streamingService.sendMessage("{ \"event\": \"conf\", \"flags\": 131072 }"));
     }
 
     @Override
