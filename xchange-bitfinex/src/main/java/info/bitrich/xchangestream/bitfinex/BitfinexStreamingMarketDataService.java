@@ -1,6 +1,5 @@
 package info.bitrich.xchangestream.bitfinex;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import info.bitrich.xchangestream.bitfinex.dto.*;
@@ -19,8 +18,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
 import java.util.zip.CRC32;
-import java.util.HashMap;
-import java.util.Map;
 
 import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.*;
 
@@ -69,6 +66,7 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                         final int csCalc = (int) crc32.getValue();
 
                         if (csCalc != checksum) {
+                            log.error("Invalid checksum " + csCalc + " vs " + checksum);
                             throw new RuntimeException("Invalid checksum " + csCalc + " vs " + checksum);
                         }
 
