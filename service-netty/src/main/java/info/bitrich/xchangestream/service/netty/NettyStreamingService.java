@@ -315,6 +315,7 @@ public abstract class NettyStreamingService<T> {
                 }
             }
         }).doOnDispose(() -> {
+            LOG.error("Unsubscribing channel {}", channelId);
             if (channels.containsKey(channelId)) {
                 sendMessage(getUnsubscribeMessage(channelId));
                 channels.remove(channelId);
