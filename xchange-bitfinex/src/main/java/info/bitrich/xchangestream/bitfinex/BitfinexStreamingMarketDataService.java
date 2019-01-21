@@ -6,6 +6,7 @@ import info.bitrich.xchangestream.bitfinex.dto.*;
 import info.bitrich.xchangestream.core.StreamingMarketDataService;
 import info.bitrich.xchangestream.service.netty.StreamingObjectMapperHelper;
 import io.reactivex.Observable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.knowm.xchange.currency.CurrencyPair;
 import org.knowm.xchange.dto.marketdata.OrderBook;
 import org.knowm.xchange.dto.marketdata.Ticker;
@@ -42,9 +43,9 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
 
         return service.subscribeChannel(channelName,
                 new Object[]{pair, "P0", depth})
-                .scan(new BitfinexOrderbook(new BitfinexOrderbookLevel[0]), (BitfinexOrderbook o, JsonNode s) -> {
+                .scan(Pair.of(new BitfinexOrderbook(new BitfinexOrderbookLevel[0]), true), (Pair<BitfinexOrderbook, Boolean> o, JsonNode s) -> {
                     if ("cs".equals(s.get(1).textValue())) {
-                        final OrderBook orderBook = adaptOrderBook(o.toBitfinexDepth(), currencyPair);
+                        final OrderBook orderBook = adaptOrderBook(o.getLeft().toBitfinexDepth(), currencyPair);
                         final int checksum = s.get(2).intValue();
 
                         final ArrayList<BigDecimal> csData = new ArrayList<>();
@@ -70,14 +71,16 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                             throw new RuntimeException("Invalid checksum " + csCalc + " vs " + checksum);
                         }
 
-                        return o;
+                        return Pair.of(o.getLeft(), false);
                     }
 
                     final BitfinexWebSocketOrderbookTransaction bitfinexWebSocketOrderbookTransaction = s.get(1).get(0).isArray() ? mapper.readValue(s.toString(), BitfinexWebSocketSnapshotOrderbook.class) : mapper.readValue(s.toString(), BitfinexWebSocketUpdateOrderbook.class);
 
-                    return bitfinexWebSocketOrderbookTransaction.toBitfinexOrderBook(o);
+                    return Pair.of(bitfinexWebSocketOrderbookTransaction.toBitfinexOrderBook(o.getLeft()), true);
                 })
-                .map((BitfinexOrderbook bo) ->adaptOrderBook(bo.toBitfinexDepth(), currencyPair));
+                .filter(Pair::getRight)
+                .map(Pair::getLeft)
+                .map((BitfinexOrderbook bo) -> adaptOrderBook(bo.toBitfinexDepth(), currencyPair));
     }
 
     @Override
