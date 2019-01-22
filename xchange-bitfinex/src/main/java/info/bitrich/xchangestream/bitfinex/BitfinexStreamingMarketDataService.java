@@ -67,8 +67,10 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                         final int csCalc = (int) crc32.getValue();
 
                         if (csCalc != checksum) {
-                            log.error("Invalid checksum " + csCalc + " vs " + checksum);
-                            throw new RuntimeException("Invalid checksum " + csCalc + " vs " + checksum);
+                            final String msg = "Invalid checksum " + csCalc + " vs " + checksum + " csStr " + csStr
+                                    + " csData " + csData;
+                            log.error(msg);
+                            throw new RuntimeException(msg);
                         }
 
                         return Pair.of(o.getLeft(), false);
