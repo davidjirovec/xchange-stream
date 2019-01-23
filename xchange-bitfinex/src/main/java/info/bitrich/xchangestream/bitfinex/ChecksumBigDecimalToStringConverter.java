@@ -12,9 +12,8 @@ import java.math.BigDecimal;
 
 class ChecksumBigDecimalToStringConverter {
 
-    private static final ScriptEngine engine = new ScriptEngineManager().getEngineByName("javascript");
-
     String convert(final BigDecimal bigDecimal) {
+        final ScriptEngine engine = new ScriptEngineManager().getEngineByName("javascript");
         ScriptContext context = engine.getContext();
         StringWriter writer = new StringWriter();
         context.setWriter(writer);
