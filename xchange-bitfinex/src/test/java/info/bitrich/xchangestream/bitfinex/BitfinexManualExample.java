@@ -54,27 +54,15 @@ public class BitfinexManualExample {
 
         Observable<OrderBook> orderBookObserver = exchange.getStreamingMarketDataService().getOrderBook(CurrencyPair.BTC_USD);
         Disposable orderBookSubscriber = orderBookObserver.subscribe(orderBook -> {
-            LOG.info("First ask: {}", orderBook.getAsks().get(0));
-            LOG.info("First bid: {}", orderBook.getBids().get(0));
+//            LOG.info("First ask: {}", orderBook.getAsks().get(0));
+//            LOG.info("First bid: {}", orderBook.getBids().get(0));
         }, throwable -> {
             LOG.error("ERROR in getting order book: ", throwable);
         });
 
-        Disposable tickerSubscriber = exchange.getStreamingMarketDataService().getTicker(CurrencyPair.BTC_EUR).subscribe(ticker -> {
-            LOG.info("TICKER: {}", ticker);
-        }, throwable -> LOG.error("ERROR in getting ticker: ", throwable));
 
-        Disposable tradesSubscriber = exchange.getStreamingMarketDataService().getTrades(CurrencyPair.BTC_USD)
-                .subscribe(trade -> {
-                    LOG.info("TRADE: {}", trade);
-                }, throwable -> {
-                    LOG.error("ERROR in getting trade: ", throwable);
-                });
+        Thread.sleep(Long.MAX_VALUE);
 
-        Thread.sleep(10000);
-
-        tickerSubscriber.dispose();
-        tradesSubscriber.dispose();
         orderBookSubscriber.dispose();
 
         LOG.info("disconnecting...");
