@@ -2,10 +2,8 @@ package info.bitrich.xchangestream.bitfinex;
 
 import info.bitrich.xchangestream.core.ProductSubscription;
 import info.bitrich.xchangestream.core.StreamingExchange;
-
 import io.reactivex.Completable;
 import io.reactivex.Observable;
-
 import org.apache.commons.lang3.StringUtils;
 import org.knowm.xchange.ExchangeSpecification;
 import org.knowm.xchange.bitfinex.v1.BitfinexExchange;
@@ -39,7 +37,8 @@ public class BitfinexStreamingExchange extends BitfinexExchange implements Strea
 
     @Override
     public Completable connect(ProductSubscription... args) {
-        return streamingService.connect();
+        return streamingService.connect()
+                .doOnComplete(() -> streamingService.sendMessage("{ \"event\": \"conf\", \"flags\": 131072 }"));
     }
 
     @Override

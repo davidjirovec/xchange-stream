@@ -1,36 +1,28 @@
 package info.bitrich.xchangestream.bitfinex;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexOrderbook;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthBalance;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthOrder;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthPreTrade;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthTrade;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketOrderbookTransaction;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSnapshotOrderbook;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSnapshotTrades;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketTickerTransaction;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketTradesTransaction;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketUpdateOrderbook;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebsocketUpdateTrade;
+import info.bitrich.xchangestream.bitfinex.dto.*;
 import info.bitrich.xchangestream.core.StreamingMarketDataService;
 import info.bitrich.xchangestream.service.netty.StreamingObjectMapperHelper;
-
 import io.reactivex.Observable;
-
+import io.reactivex.disposables.Disposable;
+import io.reactivex.schedulers.Schedulers;
+import org.apache.commons.lang3.tuple.ImmutableTriple;
 import org.knowm.xchange.currency.CurrencyPair;
 import org.knowm.xchange.dto.marketdata.OrderBook;
 import org.knowm.xchange.dto.marketdata.Ticker;
 import org.knowm.xchange.dto.marketdata.Trade;
 import org.knowm.xchange.dto.marketdata.Trades;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.zip.CRC32;
 
-import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.adaptOrderBook;
-import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.adaptTicker;
-import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.adaptTrades;
+import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.*;
 
 /**
  * Created by Lukas Zaoralek on 7.11.17.
@@ -52,21 +44,72 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
         String pair = currencyPair.base.toString() + currencyPair.counter.toString();
         final ObjectMapper mapper = StreamingObjectMapperHelper.getObjectMapper();
 
-        Observable<BitfinexWebSocketOrderbookTransaction> subscribedChannel = service.subscribeChannel(channelName,
-                new Object[]{pair, "P0", depth})
-                .map(s -> {
-                    if (s.get(1).get(0).isArray()) return mapper.treeToValue(s,
-                            BitfinexWebSocketSnapshotOrderbook.class);
-                    else return mapper.treeToValue(s, BitfinexWebSocketUpdateOrderbook.class);
+        final Observable<ImmutableTriple<BitfinexOrderbook, Integer, OrderBook>> subscribedChannel = service
+                .subscribeChannel(channelName, new Object[]{pair, "P0", depth})
+                .observeOn(Schedulers.computation())
+                .scan(
+                        ImmutableTriple.of(
+                                new BitfinexOrderbook(new BitfinexOrderbookLevel[0]), (Integer) null, (OrderBook) null
+                        ),
+                        (immutableTriple, jsonNode) -> {
+                            if ("cs".equals(jsonNode.get(1).asText())) {
+                                return ImmutableTriple.of(
+                                        immutableTriple.getLeft(), jsonNode.get(2).asInt(), immutableTriple.getRight()
+                                );
+                            } else {
+                                final BitfinexOrderbook bitfinexOrderbook = (
+                                        jsonNode.get(1).get(0).isArray()
+                                                ? mapper.treeToValue(jsonNode, BitfinexWebSocketSnapshotOrderbook.class)
+                                                : mapper.treeToValue(jsonNode, BitfinexWebSocketUpdateOrderbook.class)
+                                )
+                                        .toBitfinexOrderBook(immutableTriple.getLeft());
+                                return ImmutableTriple.of(
+                                        bitfinexOrderbook,
+                                        null,
+                                        adaptOrderBook(bitfinexOrderbook.toBitfinexDepth(), currencyPair)
+                                );
+                            }
+                        }
+                )
+                .share();
+
+        final Disposable checksumDisposable = subscribedChannel.filter(triple -> triple.getMiddle() != null)
+                .sample(1, TimeUnit.MINUTES)
+                .subscribe(triple -> {
+                    final int checksum = triple.getMiddle();
+                    final OrderBook orderBook = triple.getRight();
+
+                    final ArrayList<BigDecimal> csData = new ArrayList<>();
+
+                    for (int i = 0; i < 25; i++) {
+                        if (orderBook.getBids().size() > i) {
+                            csData.add(orderBook.getBids().get(i).getLimitPrice());
+                            csData.add(orderBook.getBids().get(i).getOriginalAmount());
+                        }
+                        if (orderBook.getAsks().size() > i) {
+                            csData.add(orderBook.getAsks().get(i).getLimitPrice());
+                            csData.add(orderBook.getAsks().get(i).getOriginalAmount().negate());
+                        }
+                    }
+
+                    final String csStr = csData.stream()
+                            .map(x -> new ChecksumBigDecimalToStringConverter().convert(x))
+                            .collect(Collectors.joining(":"));
+                    final CRC32 crc32 = new CRC32();
+                    crc32.update(csStr.getBytes());
+                    final int csCalc = (int) crc32.getValue();
+
+                    if (csCalc != checksum) {
+                        final String msg = "Invalid checksum " + csCalc + " vs " + checksum + " csStr " + csStr
+                                + " csData " + csData;
+                        log.error(msg);
+                        throw new RuntimeException(msg);
+                    }
                 });
 
-        return subscribedChannel
-                .map(s -> {
-                    BitfinexOrderbook bitfinexOrderbook = s.toBitfinexOrderBook(orderbooks.getOrDefault(currencyPair,
-                            null));
-                    orderbooks.put(currencyPair, bitfinexOrderbook);
-                    return adaptOrderBook(bitfinexOrderbook.toBitfinexDepth(), currencyPair);
-                });
+        return subscribedChannel.filter(triple -> triple.getMiddle() == null)
+                .map(ImmutableTriple::getRight)
+                .doOnDispose(checksumDisposable::dispose);
     }
 
     @Override
