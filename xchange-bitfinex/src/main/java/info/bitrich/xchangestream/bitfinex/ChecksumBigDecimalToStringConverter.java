@@ -9,17 +9,19 @@ import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
 
 class ChecksumBigDecimalToStringConverter {
 
-    String convert(final BigDecimal bigDecimal) {
+    String convert(final List<BigDecimal> bigDecimals) {
         final ScriptEngine engine = new ScriptEngineManager().getEngineByName("javascript");
         ScriptContext context = engine.getContext();
         StringWriter writer = new StringWriter();
         context.setWriter(writer);
 
         try {
-            engine.eval("print(" + bigDecimal.toString() + ")");
+            engine.eval("print([" + bigDecimals.stream().map(BigDecimal::toString).collect(Collectors.joining(",")) + "].join(':'))");
         } catch (ScriptException e) {
             throw new RuntimeException(e);
         }

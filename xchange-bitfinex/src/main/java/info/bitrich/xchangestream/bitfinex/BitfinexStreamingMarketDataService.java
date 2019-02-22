@@ -19,7 +19,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 
 import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.*;
@@ -93,9 +92,7 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                         }
                     }
 
-                    final String csStr = csData.stream()
-                            .map(x -> new ChecksumBigDecimalToStringConverter().convert(x))
-                            .collect(Collectors.joining(":"));
+                    final String csStr = new ChecksumBigDecimalToStringConverter().convert(csData);
                     final CRC32 crc32 = new CRC32();
                     crc32.update(csStr.getBytes());
                     final int csCalc = (int) crc32.getValue();
