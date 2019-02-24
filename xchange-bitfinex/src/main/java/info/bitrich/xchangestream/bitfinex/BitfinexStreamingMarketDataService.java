@@ -74,7 +74,6 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
 
         final Disposable checksumDisposable = subscribedChannel.filter(triple -> triple.getMiddle() != null)
                 .sample(1, TimeUnit.MINUTES)
-                .observeOn(Schedulers.io())
                 .subscribe(triple -> {
                     final int checksum = triple.getMiddle();
                     final OrderBook orderBook = triple.getRight();
