@@ -4,7 +4,12 @@ import org.knowm.xchange.bitfinex.v1.dto.marketdata.BitfinexDepth;
 import org.knowm.xchange.bitfinex.v1.dto.marketdata.BitfinexLevel;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import static java.math.BigDecimal.ZERO;
 
@@ -17,6 +22,11 @@ public class BitfinexOrderbook {
 
     public BitfinexOrderbook(BitfinexOrderbookLevel[] levels) {
         createFromLevels(levels);
+    }
+
+    public BitfinexOrderbook(final Map<BigDecimal, BitfinexOrderbookLevel> asks, final Map<BigDecimal, BitfinexOrderbookLevel> bids) {
+        this.asks = asks;
+        this.bids = bids;
     }
 
     private void createFromLevels(BitfinexOrderbookLevel[] levels) {
@@ -65,22 +75,23 @@ public class BitfinexOrderbook {
                 bidLevels.toArray(new BitfinexLevel[bidLevels.size()]));
     }
 
-    public void updateLevel(BitfinexOrderbookLevel level) {
-
+    public BitfinexOrderbook withLevel(BitfinexOrderbookLevel level) {
+        final HashMap<BigDecimal, BitfinexOrderbookLevel> asksCopy = new HashMap<>(asks);
+        final HashMap<BigDecimal, BitfinexOrderbookLevel> bidsCopy = new HashMap<>(bids);
 
         Map<BigDecimal, BitfinexOrderbookLevel> side;
 
         // Determine side and normalize negative ask amount values
         BitfinexOrderbookLevel bidAskLevel = level;
         if(level.getAmount().compareTo(ZERO) < 0) {
-            side = asks;
+            side = asksCopy;
             bidAskLevel = new BitfinexOrderbookLevel(
                     level.getPrice(),
                     level.getCount(),
                     level.getAmount().abs()
             );
         } else {
-            side = bids;
+            side = bidsCopy;
         }
 
         boolean shouldDelete = bidAskLevel.getCount().compareTo(ZERO) == 0;
@@ -89,5 +100,7 @@ public class BitfinexOrderbook {
         if (!shouldDelete) {
             side.put(bidAskLevel.getPrice(), bidAskLevel);
         }
+
+        return new BitfinexOrderbook(asksCopy, bidsCopy);
     }
 }
