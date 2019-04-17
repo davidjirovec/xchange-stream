@@ -71,7 +71,7 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                                 );
                             } else {
                                 final BitfinexOrderbook bitfinexOrderbook = (
-                                        jsonNode.get(1).get(0).isArray()
+                                        jsonNode.get(1).size() == 0 || jsonNode.get(1).get(0).isArray()
                                                 ? mapper.treeToValue(jsonNode, BitfinexWebSocketSnapshotOrderbook.class)
                                                 : mapper.treeToValue(jsonNode, BitfinexWebSocketUpdateOrderbook.class)
                                 )
