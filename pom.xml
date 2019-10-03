@@ -14,21 +14,22 @@
         <module>service-netty</module>
         <module>service-wamp</module>
         <module>service-core</module>
+        <module>xchange-bankera</module>
+        <module>xchange-binance</module>
+        <module>xchange-bitfinex</module>
+        <module>xchange-bitflyer</module>
+        <module>xchange-bitmex</module>
         <module>xchange-bitstamp</module>
         <module>xchange-cexio</module>
-        <module>xchange-okcoin</module>
-        <module>xchange-poloniex</module>
-        <module>xchange-coinmate</module>
         <module>xchange-coinbasepro</module>
-        <module>xchange-bitfinex</module>
-        <module>xchange-bitmex</module>
-        <module>xchange-poloniex2</module>
-        <module>xchange-bitflyer</module>
+        <module>xchange-coinmate</module>
         <module>xchange-gemini</module>
-        <module>xchange-binance</module>
         <module>xchange-hitbtc</module>
-        <module>xchange-bankera</module>
         <module>xchange-kraken</module>
+        <module>xchange-okcoin</module>
+        <module>xchange-poloniex2</module>
+        <module>xchange-poloniex</module>
+        <module>xchange-quoine</module>
     </modules>
 
     <name>xchange-stream</name>

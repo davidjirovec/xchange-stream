@@ -25,9 +25,9 @@ public class PusherStreamingService extends ConnectableService  {
         pusher = new Pusher(apiKey);
     }
 
-    public PusherStreamingService(String apiKey, String cluster) {
+    public PusherStreamingService(String apiKey, String host) {
         PusherOptions options = new PusherOptions();
-        options.setCluster(cluster);
+        options.setHost(host);
         pusher = new Pusher(apiKey, options);
     }
 
