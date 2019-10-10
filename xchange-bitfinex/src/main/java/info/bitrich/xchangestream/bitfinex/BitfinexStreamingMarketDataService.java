@@ -29,7 +29,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 
 import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.adaptOrderBook;
@@ -87,7 +86,6 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                 .share();
 
         final Disposable checksumDisposable = subscribedChannel.filter(triple -> triple.getMiddle() != null)
-                .sample(1, TimeUnit.MINUTES)
                 .subscribe(triple -> {
                     final int checksum = triple.getMiddle();
                     final OrderBook orderBook = triple.getRight();
