@@ -50,9 +50,18 @@ public class PoloniexStreamingService extends JsonNettyStreamingService {
                     JsonNode event = events.get(0);
                     if (event.get(0).toString().equals("\"i\"")) {
                         if (event.get(1).has("orderBook")) {
-                            String currencyPair = event.get(1).get("currencyPair").asText();
-                            LOG.info("Register {} as {}", String.valueOf(channelId), currencyPair);
-                            subscribedChannels.put(String.valueOf(channelId), currencyPair);
+                            subscribedChannels.compute(String.valueOf(channelId), (key, oldValue) -> {
+                                String currencyPair = event.get(1).get("currencyPair").asText();
+                                if (oldValue != null && !oldValue.equals(currencyPair)) {
+                                    throw new RuntimeException("Attempted currency pair channel id reassignment");
+                                }
+                                if (oldValue == null) {
+                                    LOG.info("Register {} as {}", channelId, currencyPair);
+                                } else {
+                                    LOG.debug("Order book reinitialization {} {}", channelId, currencyPair);
+                                }
+                                return currencyPair;
+                            });
                         }
                     }
                 }
