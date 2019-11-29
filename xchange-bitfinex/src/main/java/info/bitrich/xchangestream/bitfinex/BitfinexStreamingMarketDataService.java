@@ -7,6 +7,7 @@ import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthBalance;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthOrder;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthPreTrade;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthTrade;
+import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketOrderbookTransaction;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSnapshotOrderbook;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSnapshotTrades;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketTickerTransaction;
@@ -35,6 +36,9 @@ import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.adaptOrderBook;
 import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.adaptTicker;
 import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.adaptTrades;
 import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.log;
+import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptOrderBook;
+import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptTicker;
+import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptTrades;
 
 /**
  * Created by Lukas Zaoralek on 7.11.17.
@@ -158,21 +162,5 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                     Trades adaptedTrades = adaptTrades(s.toBitfinexTrades(), currencyPair);
                     return adaptedTrades.getTrades();
                 });
-    }
-
-    public Observable<BitfinexWebSocketAuthOrder> getRawAuthenticatedOrders() {
-        return service.getAuthenticatedOrders();
-    }
-
-    public Observable<BitfinexWebSocketAuthPreTrade> getRawAuthenticatedPreTrades() {
-        return service.getAuthenticatedPreTrades();
-    }
-
-    public Observable<BitfinexWebSocketAuthTrade> getRawAuthenticatedTrades() {
-        return service.getAuthenticatedTrades();
-    }
-
-    public Observable<BitfinexWebSocketAuthBalance> getRawAuthenticatedBalances() {
-        return service.getAuthenticatedBalances();
     }
 }

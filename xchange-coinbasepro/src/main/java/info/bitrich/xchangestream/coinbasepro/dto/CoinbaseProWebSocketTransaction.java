@@ -2,20 +2,27 @@ package info.bitrich.xchangestream.coinbasepro.dto;
 
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
+import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TimeZone;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import org.knowm.xchange.coinbasepro.dto.marketdata.CoinbaseProProductBook;
 import org.knowm.xchange.coinbasepro.dto.marketdata.CoinbaseProProductStats;
 import org.knowm.xchange.coinbasepro.dto.marketdata.CoinbaseProProductTicker;
 import org.knowm.xchange.coinbasepro.dto.marketdata.CoinbaseProTrade;
 import org.knowm.xchange.coinbasepro.dto.trade.CoinbaseProFill;
+import org.knowm.xchange.currency.CurrencyPair;
+import org.knowm.xchange.dto.Order.OrderType;
+import org.knowm.xchange.dto.marketdata.OrderBook;
+import org.knowm.xchange.dto.trade.LimitOrder;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import info.bitrich.xchangestream.coinbasepro.CoinbaseProStreamingAdapters;
 
 /**
  * Domain object mapping a CoinbasePro web socket message.
@@ -114,10 +121,14 @@ public class CoinbaseProWebSocketTransaction {
         this.profileId = profileId;
     }
 
-    private String[][] CoinbaseProOrderBookChanges(String side, String[][] changes, SortedMap<BigDecimal, String> sideEntries,
+    private List<LimitOrder> coinbaseProOrderBookChanges(String side, OrderType orderType, CurrencyPair currencyPair, String[][] changes, SortedMap<BigDecimal, BigDecimal> sideEntries,
                                             int maxDepth) {
         if (changes.length == 0) {
-            return null;
+            return Collections.emptyList();
+        }
+
+        if (sideEntries == null) {
+            return Collections.emptyList();
         }
 
         for (String[] level : changes) {
@@ -126,31 +137,33 @@ public class CoinbaseProWebSocketTransaction {
             }
 
             BigDecimal price = new BigDecimal(level[level.length - 2]);
-            String volume = level[level.length - 1];
+            BigDecimal volume = new BigDecimal(level[level.length - 1]);
             sideEntries.put(price, volume);
         }
 
-        List<String[]> levels = new ArrayList<>();
-        int currentDepth = 0;
-        for (Map.Entry<BigDecimal, String> level : sideEntries.entrySet()) {
-            if (maxDepth > 0 && currentDepth > maxDepth) continue;
-            String volume = level.getValue();
-            if (!volume.equals("0")) {
-                levels.add(new String[]{level.getKey().toString(), volume, "1"});
-                currentDepth++;
-            }
+        Stream<Entry<BigDecimal, BigDecimal>> stream = sideEntries.entrySet()
+              .stream()
+              .filter(level -> level.getValue().compareTo(BigDecimal.ZERO) != 0);
+        if (maxDepth != 0) {
+          stream = stream.limit(maxDepth);
         }
-
-        return levels.toArray(new String[levels.size()][]);
+        return stream.map(level -> new LimitOrder(
+              orderType,
+              level.getValue(),
+              currencyPair,
+              "0",
+              null,
+              level.getKey()))
+            .collect(Collectors.toList());
     }
 
-    public CoinbaseProProductBook toCoinbaseProProductBook(SortedMap<BigDecimal, String> bids, SortedMap<BigDecimal, String> asks,
-                                             int maxDepth) {
-        String[][] gdaxOrderBookBids = CoinbaseProOrderBookChanges("buy", changes != null ? changes : this.bids,
+    public OrderBook toOrderBook(SortedMap<BigDecimal, BigDecimal> bids, SortedMap<BigDecimal, BigDecimal> asks, int maxDepth, CurrencyPair currencyPair) {
+        // For efficiency, we go straight to XChange format
+        List<LimitOrder> gdaxOrderBookBids = coinbaseProOrderBookChanges("buy", OrderType.BID, currencyPair, changes != null ? changes : this.bids,
                 bids, maxDepth);
-        String[][] gdaxOrderBookAsks = CoinbaseProOrderBookChanges("sell", changes != null ? changes : this.asks,
+        List<LimitOrder> gdaxOrderBookAsks = coinbaseProOrderBookChanges("sell", OrderType.ASK, currencyPair, changes != null ? changes : this.asks,
                 asks, maxDepth);
-        return new CoinbaseProProductBook((long) 0, gdaxOrderBookBids, gdaxOrderBookAsks);
+        return new OrderBook(time == null ? null : CoinbaseProStreamingAdapters.parseDate(time), gdaxOrderBookAsks, gdaxOrderBookBids, false);
     }
 
     public CoinbaseProProductTicker toCoinbaseProProductTicker() {
@@ -168,12 +181,21 @@ public class CoinbaseProWebSocketTransaction {
     }
 
     public CoinbaseProTrade toCoinbaseProTrade() {
-        return new CoinbaseProTrade(time, tradeId, price, size, side);
+        return new CoinbaseProTrade(time, tradeId, price, size, side, makerOrderId, takerOrderId);
     }
 
     public CoinbaseProFill toCoinbaseProFill() {
         boolean taker = userId != null && takerUserId != null && userId.equals(takerUserId);
-        return new CoinbaseProFill(String.valueOf(tradeId), productId, price, size, taker ? takerOrderId : makerOrderId, time, null, null, true, side);
+        // buy/sell are flipped on the taker side.
+        String useSide = side;
+        if (taker && side != null) {
+            if ("buy".equals(side)) {
+                useSide = "sell";
+            } else {
+                useSide = "buy";
+            }
+        }
+        return new CoinbaseProFill(String.valueOf(tradeId), productId, price, size, taker ? takerOrderId : makerOrderId, time, null, null, true, useSide);
     }
 
     public String getType() {
@@ -295,6 +317,7 @@ public class CoinbaseProWebSocketTransaction {
         sb.append(", orderId='").append(orderId).append('\'');
         sb.append(", orderType='").append(orderType).append('\'');
         sb.append(", size=").append(size);
+        sb.append(", remainingSize=").append(remainingSize);
         sb.append(", price=").append(price);
         sb.append(", bestBid=").append(bestBid);
         sb.append(", bestAsk=").append(bestAsk);
@@ -304,10 +327,15 @@ public class CoinbaseProWebSocketTransaction {
         sb.append(", low24h=").append(low24h);
         sb.append(", high24h=").append(high24h);
         sb.append(", side='").append(side).append('\'');
+        sb.append(", bids=").append(bids);
+        sb.append(", asks=").append(asks);
+        sb.append(", changes=").append(asks);
         sb.append(", clientOid='").append(clientOid).append('\'');
         sb.append(", productId='").append(productId).append('\'');
         sb.append(", sequence=").append(sequence);
         sb.append(", time='").append(time).append('\'');
+        sb.append(", reason='").append(reason).append('\'');
+        sb.append(", trade_id='").append(tradeId).append('\'');
         if ( userId != null )
         	sb.append(", userId='").append(userId).append('\'');
         if ( profileId != null )
