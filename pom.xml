@@ -20,7 +20,6 @@
         <module>xchange-poloniex</module>
         <module>xchange-coinmate</module>
         <module>xchange-coinbasepro</module>
-        <module>xchange-bitfinex</module>
         <module>xchange-bitmex</module>
         <module>xchange-poloniex2</module>
         <module>xchange-bitflyer</module>
