@@ -3,11 +3,6 @@ package info.bitrich.xchangestream.bitfinex;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexOrderbook;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexOrderbookLevel;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthBalance;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthOrder;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthPreTrade;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketAuthTrade;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketOrderbookTransaction;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSnapshotOrderbook;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSnapshotTrades;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketTickerTransaction;
@@ -32,10 +27,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.CRC32;
 
-import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.adaptOrderBook;
-import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.adaptTicker;
-import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.adaptTrades;
-import static org.knowm.xchange.bitfinex.v1.BitfinexAdapters.log;
 import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptOrderBook;
 import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptTicker;
 import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptTrades;
@@ -115,7 +106,6 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                     if (csCalc != checksum) {
                         final String msg = "Invalid checksum " + csCalc + " vs " + checksum + " csStr " + csStr
                                 + " csData " + csData + " for " + currencyPair;
-                        log.error(msg);
                         throw new RuntimeException(msg);
                     }
                 });
