@@ -12,6 +12,7 @@ import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebsocketUpdateTrade;
 import info.bitrich.xchangestream.core.StreamingMarketDataService;
 import info.bitrich.xchangestream.service.netty.StreamingObjectMapperHelper;
 import io.reactivex.Observable;
+import org.knowm.xchange.bitfinex.service.BitfinexAdapters;
 import org.knowm.xchange.currency.CurrencyPair;
 import org.knowm.xchange.dto.marketdata.OrderBook;
 import org.knowm.xchange.dto.marketdata.Ticker;
@@ -36,7 +37,7 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
     public Observable<OrderBook> getOrderBook(CurrencyPair currencyPair, Object... args) {
         String channelName = "book";
         final String depth = args.length > 0 ? args[0].toString() : "100";
-        String pair = currencyPair.base.toString() + currencyPair.counter.toString();
+        final String pair = BitfinexAdapters.adaptCurrencyPair(currencyPair).substring(1);
         final ObjectMapper mapper = StreamingObjectMapperHelper.getObjectMapper();
 
         Observable<BitfinexWebSocketOrderbookTransaction> subscribedChannel = service.subscribeChannel(channelName,
