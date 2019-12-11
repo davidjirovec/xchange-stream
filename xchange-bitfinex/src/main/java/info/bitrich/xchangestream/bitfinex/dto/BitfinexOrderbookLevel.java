@@ -19,9 +19,6 @@ public class BitfinexOrderbookLevel {
 
     public BigDecimal amount;
 
-    // Xchange-bitfinex adapter expects the timestamp to be seconds since Epoch.
-    private final BigDecimal timestamp = new BigDecimal(System.currentTimeMillis() / 1000);
-
     public BitfinexOrderbookLevel() {
     }
 
@@ -44,6 +41,7 @@ public class BitfinexOrderbookLevel {
     }
 
     public BitfinexLevel toBitfinexLevel() {
-        return new BitfinexLevel(price, amount, timestamp);
+        // Xchange-bitfinex adapter expects the timestamp to be seconds since Epoch.
+        return new BitfinexLevel(price, amount, new BigDecimal(System.currentTimeMillis() / 1000));
     }
 }
