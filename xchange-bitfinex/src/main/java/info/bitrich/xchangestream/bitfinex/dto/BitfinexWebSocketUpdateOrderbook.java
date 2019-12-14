@@ -20,4 +20,8 @@ public class BitfinexWebSocketUpdateOrderbook extends BitfinexWebSocketOrderbook
     public BitfinexOrderbook toBitfinexOrderBook(BitfinexOrderbook orderbook) {
         return orderbook.withLevel(level);
     }
+
+    public BitfinexOrderbookLevel getLevel() {
+        return level;
+    }
 }

@@ -3,15 +3,15 @@ package info.bitrich.xchangestream.bitfinex;
 import info.bitrich.xchangestream.core.StreamingExchange;
 import info.bitrich.xchangestream.core.StreamingExchangeFactory;
 import info.bitrich.xchangestream.service.ConnectableService;
-import io.reactivex.Observable;
 import io.reactivex.disposables.Disposable;
 import org.apache.commons.lang3.concurrent.TimedSemaphore;
 import org.knowm.xchange.ExchangeSpecification;
-import org.knowm.xchange.currency.CurrencyPair;
-import org.knowm.xchange.dto.marketdata.OrderBook;
-import org.knowm.xchange.utils.CertHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
 
@@ -31,7 +31,7 @@ public class BitfinexManualExample {
     }
 
     public static void main(String[] args) throws Exception {
-        CertHelper.trustAllCerts();
+//        CertHelper.trustAllCerts();
 
         ExchangeSpecification defaultExchangeSpecification = new ExchangeSpecification(BitfinexStreamingExchange.class);
         defaultExchangeSpecification.setExchangeSpecificParametersItem(ConnectableService.BEFORE_CONNECTION_HANDLER, (Runnable) BitfinexManualExample::rateLimit);
@@ -52,30 +52,34 @@ public class BitfinexManualExample {
         StreamingExchange exchange = StreamingExchangeFactory.INSTANCE.createExchange(defaultExchangeSpecification);
         exchange.connect().blockingAwait();
 
-        Observable<OrderBook> orderBookObserver = exchange.getStreamingMarketDataService().getOrderBook(CurrencyPair.BTC_USD);
-        Disposable orderBookSubscriber = orderBookObserver.subscribe(orderBook -> {
-            LOG.info("First ask: {}", orderBook.getAsks().get(0));
-            LOG.info("First bid: {}", orderBook.getBids().get(0));
-        }, throwable -> {
-            LOG.error("ERROR in getting order book: ", throwable);
-        });
+        final List<Disposable> collect = exchange.getExchangeSymbols().stream().limit(30).map(currencyPair -> exchange.getStreamingMarketDataService().getOrderBook(currencyPair).subscribe(orderBook -> {
+            new Date();
+        })).collect(Collectors.toList());
 
-        Disposable tickerSubscriber = exchange.getStreamingMarketDataService().getTicker(CurrencyPair.BTC_EUR).subscribe(ticker -> {
-            LOG.info("TICKER: {}", ticker);
-        }, throwable -> LOG.error("ERROR in getting ticker: ", throwable));
+//        Observable<OrderBook> orderBookObserver = exchange.getStreamingMarketDataService().getOrderBook(CurrencyPair.BTC_USD);
+//        Disposable orderBookSubscriber = orderBookObserver.subscribe(orderBook -> {
+//            LOG.info("First ask: {}", orderBook.getAsks().get(0));
+//            LOG.info("First bid: {}", orderBook.getBids().get(0));
+//        }, throwable -> {
+//            LOG.error("ERROR in getting order book: ", throwable);
+//        });
 
-        Disposable tradesSubscriber = exchange.getStreamingMarketDataService().getTrades(CurrencyPair.BTC_USD)
-                .subscribe(trade -> {
-                    LOG.info("TRADE: {}", trade);
-                }, throwable -> {
-                    LOG.error("ERROR in getting trade: ", throwable);
-                });
+//        Disposable tickerSubscriber = exchange.getStreamingMarketDataService().getTicker(CurrencyPair.BTC_EUR).subscribe(ticker -> {
+//            LOG.info("TICKER: {}", ticker);
+//        }, throwable -> LOG.error("ERROR in getting ticker: ", throwable));
+//
+//        Disposable tradesSubscriber = exchange.getStreamingMarketDataService().getTrades(CurrencyPair.BTC_USD)
+//                .subscribe(trade -> {
+//                    LOG.info("TRADE: {}", trade);
+//                }, throwable -> {
+//                    LOG.error("ERROR in getting trade: ", throwable);
+//                });
 
-        Thread.sleep(10000);
+        Thread.sleep(Long.MAX_VALUE);
 
-        tickerSubscriber.dispose();
-        tradesSubscriber.dispose();
-        orderBookSubscriber.dispose();
+//        tickerSubscriber.dispose();
+//        tradesSubscriber.dispose();
+//        orderBookSubscriber.dispose();
 
         LOG.info("disconnecting...");
         exchange.disconnect().subscribe(() -> LOG.info("disconnected"));

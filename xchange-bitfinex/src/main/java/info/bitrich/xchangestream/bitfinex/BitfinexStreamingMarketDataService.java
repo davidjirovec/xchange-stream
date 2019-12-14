@@ -1,7 +1,6 @@
 package info.bitrich.xchangestream.bitfinex;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexOrderbook;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexOrderbookLevel;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSnapshotOrderbook;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSnapshotTrades;
@@ -14,21 +13,26 @@ import info.bitrich.xchangestream.service.netty.StreamingObjectMapperHelper;
 import io.reactivex.Observable;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
+import io.vavr.API;
+import io.vavr.Tuple2;
+import io.vavr.collection.List;
+import io.vavr.collection.TreeMap;
 import org.apache.commons.lang3.tuple.ImmutableTriple;
 import org.knowm.xchange.bitfinex.service.BitfinexAdapters;
 import org.knowm.xchange.currency.CurrencyPair;
+import org.knowm.xchange.dto.Order;
 import org.knowm.xchange.dto.marketdata.OrderBook;
 import org.knowm.xchange.dto.marketdata.Ticker;
 import org.knowm.xchange.dto.marketdata.Trade;
 import org.knowm.xchange.dto.marketdata.Trades;
+import org.knowm.xchange.dto.trade.LimitOrder;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collections;
 import java.util.zip.CRC32;
 
-import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptOrderBook;
+import static java.math.BigDecimal.ZERO;
 import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptTicker;
 import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptTrades;
 
@@ -39,10 +43,68 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
 
     private final BitfinexStreamingService service;
 
-    private final Map<CurrencyPair, BitfinexOrderbook> orderbooks = new HashMap<>();
-
     public BitfinexStreamingMarketDataService(BitfinexStreamingService service) {
         this.service = service;
+    }
+
+    private Tuple2<TreeMap<BigDecimal, LimitOrder>, TreeMap<BigDecimal, LimitOrder>> createFromLevels(
+            BitfinexOrderbookLevel[] levels, CurrencyPair currencyPair
+    ) {
+        final Tuple2<List<BitfinexOrderbookLevel>, List<BitfinexOrderbookLevel>> partition = List.of(levels)
+                .filter(level -> level.getCount().compareTo(ZERO) != 0)
+                .partition(level -> level.getAmount().compareTo(ZERO) > 0);
+        return API.Tuple(
+                ((TreeMap)
+                        partition._2
+                                .toSortedMap(
+                                        BitfinexOrderbookLevel::getPrice,
+                                        level -> BitfinexAdapters.adaptOrder(
+                                                level.getAmount().abs(),
+                                                level.getPrice(),
+                                                currencyPair,
+                                                Order.OrderType.ASK,
+                                                null
+                                        )
+                                )
+                ),
+                ((TreeMap)
+                        partition._1
+                                .toSortedMap(
+                                        Collections.reverseOrder(),
+                                        BitfinexOrderbookLevel::getPrice,
+                                        level -> BitfinexAdapters.adaptOrder(
+                                                level.getAmount(),
+                                                level.getPrice(),
+                                                currencyPair,
+                                                Order.OrderType.ASK, null
+                                        )
+                                )
+                )
+        );
+    }
+
+    public Tuple2<TreeMap<BigDecimal, LimitOrder>, TreeMap<BigDecimal, LimitOrder>> withLevel(
+            Tuple2<TreeMap<BigDecimal, LimitOrder>, TreeMap<BigDecimal, LimitOrder>> old,
+            BitfinexOrderbookLevel level, CurrencyPair currencyPair
+    ) {
+        final boolean isAsk = level.getAmount().compareTo(ZERO) < 0;
+
+        final TreeMap<BigDecimal, LimitOrder> toModify = isAsk ? old._1 : old._2;
+
+        final TreeMap<BigDecimal, LimitOrder> updatedSide = level.getCount().compareTo(ZERO) != 0
+                ? toModify.put(
+                        level.getPrice(),
+                        BitfinexAdapters.adaptOrder(
+                                level.getAmount().abs(),
+                                level.getPrice(),
+                                currencyPair,
+                                isAsk ? Order.OrderType.ASK : Order.OrderType.BID,
+                                null
+                        )
+                )
+                : toModify.remove(level.getPrice());
+
+        return isAsk ? API.Tuple(updatedSide, old._2) : API.Tuple(old._1, updatedSide);
     }
 
     @Override
@@ -52,12 +114,22 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
         final String pair = BitfinexAdapters.adaptCurrencyPair(currencyPair).substring(1);
         final ObjectMapper mapper = StreamingObjectMapperHelper.getObjectMapper();
 
-        final Observable<ImmutableTriple<BitfinexOrderbook, Integer, OrderBook>> subscribedChannel = service
+        final Observable<
+                ImmutableTriple<
+                        Tuple2<TreeMap<BigDecimal, LimitOrder>, TreeMap<BigDecimal, LimitOrder>>, Integer, OrderBook
+                        >
+                > subscribedChannel
+                = service
                 .subscribeChannel(channelName, new Object[]{pair, "P0", depth})
                 .observeOn(Schedulers.computation())
                 .scan(
                         ImmutableTriple.of(
-                                new BitfinexOrderbook(new BitfinexOrderbookLevel[0]), (Integer) null, (OrderBook) null
+                                API.Tuple(
+                                        TreeMap.<BigDecimal, LimitOrder>empty(),
+                                        TreeMap.<BigDecimal, LimitOrder>empty(Collections.reverseOrder())
+                                ),
+                                (Integer) null,
+                                (OrderBook) null
                         ),
                         (immutableTriple, jsonNode) -> {
                             if ("cs".equals(jsonNode.get(1).asText())) {
@@ -65,17 +137,22 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                                         immutableTriple.getLeft(), jsonNode.get(2).asInt(), immutableTriple.getRight()
                                 );
                             } else {
-                                final BitfinexOrderbook bitfinexOrderbook = (
-                                        jsonNode.get(1).size() == 0 || jsonNode.get(1).get(0).isArray()
-                                                ? mapper.treeToValue(jsonNode, BitfinexWebSocketSnapshotOrderbook.class)
-                                                : mapper.treeToValue(jsonNode, BitfinexWebSocketUpdateOrderbook.class)
-                                )
-                                        .toBitfinexOrderBook(immutableTriple.getLeft());
-                                return ImmutableTriple.of(
-                                        bitfinexOrderbook,
-                                        null,
-                                        adaptOrderBook(bitfinexOrderbook.toBitfinexDepth(), currencyPair)
+                                final Tuple2<TreeMap<BigDecimal, LimitOrder>, TreeMap<BigDecimal, LimitOrder>> tuple2
+                                        = jsonNode.get(1).size() == 0 || jsonNode.get(1).get(0).isArray()
+                                        ? createFromLevels(
+                                                mapper.treeToValue(jsonNode, BitfinexWebSocketSnapshotOrderbook.class)
+                                                        .levels,
+                                                currencyPair
+                                       )
+                                        : withLevel(
+                                                immutableTriple.getLeft(),
+                                                mapper.treeToValue(jsonNode, BitfinexWebSocketUpdateOrderbook.class).getLevel(),
+                                                currencyPair
+                                       );
+                                final OrderBook orderBook = new OrderBook(
+                                        null, tuple2._1.values().toJavaStream(), tuple2._2.values().toJavaStream()
                                 );
+                                return ImmutableTriple.of(tuple2, null, orderBook);
                             }
                         }
                 )
