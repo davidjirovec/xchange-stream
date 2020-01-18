@@ -1,5 +1,7 @@
 package info.bitrich.xchangestream.bitfinex.dto;
 
+import org.knowm.xchange.currency.CurrencyPair;
+
 /**
  * Created by Lukas Zaoralek on 8.11.17.
  */
@@ -17,5 +19,5 @@ public abstract class BitfinexWebSocketOrderbookTransaction {
         return channelId;
     }
 
-    public abstract BitfinexOrderbook toBitfinexOrderBook(BitfinexOrderbook orderbook);
+    public abstract BitfinexOrderbook updateOrderbook(BitfinexOrderbook oldOrderbook, CurrencyPair currencyPair);
 }
