@@ -12,7 +12,7 @@ public class BitfinexOrderbook {
     private final Date date;
 
     public BitfinexOrderbook() {
-        this(new BitfinexOrderbookSide(), new BitfinexOrderbookSide(), new Date());
+        this(new BitfinexOrderbookSide(false), new BitfinexOrderbookSide(true), new Date());
     }
 
     public BitfinexOrderbook(final BitfinexOrderbookSide asks, final BitfinexOrderbookSide bids, final Date date) {
