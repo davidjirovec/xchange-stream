@@ -25,23 +25,12 @@ public class BitfinexOrderbook {
         return asks;
     }
 
-    public BitfinexOrderbook withAsks(final BitfinexOrderbookSide asks) {
-        return new BitfinexOrderbook(asks, bids, date);
-    }
-
     public BitfinexOrderbookSide getBids() {
         return bids;
-    }
-
-    public BitfinexOrderbook withBids(final BitfinexOrderbookSide bids) {
-        return new BitfinexOrderbook(asks, bids, date);
     }
 
     public Date getDate() {
         return date;
     }
 
-    public BitfinexOrderbook withDate(final Date date) {
-        return new BitfinexOrderbook(asks, bids, date);
-    }
 }
