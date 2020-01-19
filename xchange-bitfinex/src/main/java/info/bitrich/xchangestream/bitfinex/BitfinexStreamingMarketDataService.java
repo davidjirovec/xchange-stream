@@ -2,23 +2,31 @@ package info.bitrich.xchangestream.bitfinex;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexOrderbook;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketOrderbookTransaction;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSnapshotOrderbook;
+import info.bitrich.xchangestream.bitfinex.dto.BitfinexOrderbookLevel;
+import info.bitrich.xchangestream.bitfinex.dto.BitfinexOrderbookSide;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketSnapshotTrades;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketTickerTransaction;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketTradesTransaction;
-import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebSocketUpdateOrderbook;
 import info.bitrich.xchangestream.bitfinex.dto.BitfinexWebsocketUpdateTrade;
 import info.bitrich.xchangestream.core.StreamingMarketDataService;
 import info.bitrich.xchangestream.service.netty.StreamingObjectMapperHelper;
 import io.reactivex.Observable;
+import io.vavr.Tuple2;
+import io.vavr.collection.List;
+import io.vavr.collection.SortedMap;
 import org.knowm.xchange.bitfinex.service.BitfinexAdapters;
 import org.knowm.xchange.currency.CurrencyPair;
+import org.knowm.xchange.dto.Order;
 import org.knowm.xchange.dto.marketdata.OrderBook;
 import org.knowm.xchange.dto.marketdata.Ticker;
 import org.knowm.xchange.dto.marketdata.Trade;
 import org.knowm.xchange.dto.marketdata.Trades;
+import org.knowm.xchange.dto.trade.LimitOrder;
 
+import java.math.BigDecimal;
+import java.util.Date;
+
+import static io.vavr.API.Tuple;
 import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptTicker;
 import static org.knowm.xchange.bitfinex.service.BitfinexAdapters.adaptTrades;
 
@@ -40,19 +48,31 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
         final String pair = BitfinexAdapters.adaptCurrencyPair(currencyPair).substring(1);
         final ObjectMapper mapper = StreamingObjectMapperHelper.getObjectMapper();
 
-        Observable<BitfinexWebSocketOrderbookTransaction> subscribedChannel = service.subscribeChannel(channelName,
+        Observable<List<BitfinexOrderbookLevel>> subscribedChannel = service.subscribeChannel(channelName,
                 new Object[]{pair, "P0", depth})
-                .map(s -> {
-                    if (s.get(1).get(0).isArray()) return mapper.treeToValue(s,
-                            BitfinexWebSocketSnapshotOrderbook.class);
-                    else return mapper.treeToValue(s, BitfinexWebSocketUpdateOrderbook.class);
-                });
+                .map(s ->
+                        mapper.readValue(
+                                mapper.treeAsTokens(
+                                        s.get(1).get(0).isArray() ? s.get(1) : mapper.createArrayNode().add(s.get(1))
+                                ),
+                                mapper.getTypeFactory()
+                                        .constructCollectionLikeType(List.class, BitfinexOrderbookLevel.class)
+                        )
+                );
 
         return subscribedChannel
                 .scan(
                         new BitfinexOrderbook(),
-                        (bitfinexOrderbook, bitfinexWebSocketOrderbookTransaction) ->
-                                bitfinexWebSocketOrderbookTransaction.updateOrderbook(bitfinexOrderbook, currencyPair)
+                        (bitfinexOrderbook, bitfinexOrderbookLevels) -> {
+                            final Date date = new Date();
+                            final Tuple2<SortedMap<BigDecimal, LimitOrder>, SortedMap<BigDecimal, LimitOrder>> asksBids
+                                    = updateAsksBids(bitfinexOrderbookLevels, bitfinexOrderbook, currencyPair, date);
+                            return new BitfinexOrderbook(
+                                    getSide(asksBids._1, bitfinexOrderbook.getAsks()),
+                                    getSide(asksBids._2, bitfinexOrderbook.getBids()),
+                                    date
+                            );
+                        }
                 )
                 .skip(1)
                 .map(bitfinexOrderbook ->
@@ -62,6 +82,49 @@ public class BitfinexStreamingMarketDataService implements StreamingMarketDataSe
                                 bitfinexOrderbook.getBids().getList()
                         )
                 );
+    }
+
+    private Tuple2<SortedMap<BigDecimal, LimitOrder>, SortedMap<BigDecimal, LimitOrder>> updateAsksBids(
+            final List<BitfinexOrderbookLevel> bitfinexOrderbookLevels,
+            final BitfinexOrderbook bitfinexOrderbook,
+            final CurrencyPair currencyPair,
+            final Date date
+    ) {
+        return bitfinexOrderbookLevels.foldLeft(
+                Tuple(bitfinexOrderbook.getAsks().getSortedMap(), bitfinexOrderbook.getBids().getSortedMap()),
+                (asksBids, level) -> level.amount.signum() < 0
+                        ? asksBids.map1(sortedMap -> update(sortedMap, level, currencyPair, Order.OrderType.ASK, date))
+                        : asksBids.map2(sortedMap -> update(sortedMap, level, currencyPair, Order.OrderType.BID, date))
+        );
+    }
+
+    private BitfinexOrderbookSide getSide(
+            final SortedMap<BigDecimal, LimitOrder> sortedMap, final BitfinexOrderbookSide bitfinexOrderbookSide
+    ) {
+        return sortedMap == bitfinexOrderbookSide.getSortedMap()
+                ? bitfinexOrderbookSide
+                : new BitfinexOrderbookSide(sortedMap, sortedMap.values().asJava());
+    }
+
+    private SortedMap<BigDecimal, LimitOrder> update(
+            final SortedMap<BigDecimal, LimitOrder> sortedMap,
+            final BitfinexOrderbookLevel bitfinexOrderbookLevel,
+            final CurrencyPair currencyPair,
+            final Order.OrderType orderType,
+            final Date date
+    ) {
+        return bitfinexOrderbookLevel.count.signum() == 0
+                ? sortedMap.remove(bitfinexOrderbookLevel.price)
+                : sortedMap.put(
+                        bitfinexOrderbookLevel.price,
+                        BitfinexAdapters.adaptOrder(
+                                bitfinexOrderbookLevel.amount.abs(),
+                                bitfinexOrderbookLevel.price,
+                                currencyPair,
+                                orderType,
+                                date
+                        )
+                    );
     }
 
     @Override

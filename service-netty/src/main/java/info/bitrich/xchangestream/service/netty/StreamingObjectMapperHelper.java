@@ -3,6 +3,7 @@ package info.bitrich.xchangestream.service.netty;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.vavr.jackson.datatype.VavrModule;
 
 /**
  * This class should be merged with ObjectMapperHelper from XStream..
@@ -15,6 +16,7 @@ public class StreamingObjectMapperHelper {
 
     static {
         objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new VavrModule());
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         objectMapper.enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
         objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
